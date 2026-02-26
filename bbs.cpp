@@ -1,50 +1,56 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import RPi.GPIO as GPIO
 
 class R2R_DAC:
-    def init(self, gpio_bits, dynamic_range):
-        self.gpio_bits = gpio_bits
-        self.dynamic_range = dynamic_range
+    def init(self, pins, v_min=0.0, v_max=3.3):
+        self.pins = pins
+        self.v_min = v_min
+        self.v_max = v_max
         
         GPIO.setmode(GPIO.BCM)
-        for pin in self.gpio_bits:
+        for pin in pins:
             GPIO.setup(pin, GPIO.OUT)
-            GPIO.output(pin, GPIO.LOW)
+            GPIO.output(pin, 0)
     
-    def deinit(self):
-        GPIO.output(self.gpio_bits, 0)
-        GPIO.cleanup()
-    
-    def voltage_to_number(self, voltage):
-        if not (0.0 <= voltage <= self.dynamic_range):
-            print(f"Напряжение выходит за динамический диапазон ЦАП (0.00 - {self.dynamic_range:.2f} В)")
-            print("Устанавливаем 0.0 В")
-            return 0
-        return int(voltage / self.dynamic_range * 255)
-    
-    def number_to_dac(self, number):
-        bits = [(number >> i) & 1 for i in range(7, -1, -1)]
-        GPIO.output(self.gpio_bits, bits)
-        print(f"Число на вход ЦАП: {number}, биты: {bits}")
-    
-    def set_voltage(self, voltage):
-        number = self.voltage_to_number(voltage)
-        self.number_to_dac(number)
-
-if name == "main":
-    dac = None
-    try:
-        dac = R2R_DAC([16, 20, 21, 25, 26, 17, 27, 22], 3.3)
+    def set(self, voltage):
+        """Установить напряжение"""
+        # Считаем число для ЦАП
+        value = int((voltage - self.v_min) / (self.v_max - self.v_min) * 255)
+        value = max(0, min(255, value))
         
-        while True:
-            try:
-                voltage = float(input("Введите напряжение в Вольтах: "))
-                dac.set_voltage(voltage)
-            except ValueError:
-                print("Вы ввели не число. Попробуйте ещё раз\n")
+        # Выставляем биты
+        for i, pin in enumerate(self.pins):
+            GPIO.output(pin, (value >> (7-i)) & 1)
     
-    except KeyboardInterrupt:
-        print("\nПрограмма прервана пользователем")
+    def off(self):
+        """Выключить (0 В)"""
+        for pin in self.pins:
+            GPIO.output(pin, 0)
+        GPIO.cleanup()
+
+# ============ ПРОСТОЕ ИСПОЛЬЗОВАНИЕ ============
+
+# Создаем ЦАП
+dac = R2R_DAC(
+    pins=[17, 18, 22, 23, 24, 25, 26, 27],  # пины
+    v_min=0.0,                                # минимум
+    v_max=3.3                                 # максимум
+)
+
+try:
+    # Устанавливаем напряжение (меняй это число)
+    dac.set(2.5)  # ← СЮДА ПИШИ СВОЕ НАПРЯЖЕНИЕ
     
-    finally:
-        if dac:
-            dac.deinit()
+    print("Напряжение установлено!")
+    print("Работает... (нажми Ctrl+C для выхода)")
+    
+    # Бесконечный цикл, чтобы программа не закрылась
+    while True:
+        pass
+        
+except KeyboardInterrupt:
+    print("\nВыключаем...")
+finally:
+    dac.off()
