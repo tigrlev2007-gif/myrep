@@ -1,42 +1,18 @@
-#!/usr/bin/env python3
-import RPi.GPIO as GPIO
-import math
-import time
-
-class DAC:
-    def init(self, pins, vmax=3.3):
-        self.pins = pins
-        self.vmax = vmax
-        
-        GPIO.setmode(GPIO.BCM)
-        for p in pins:
-            GPIO.setup(p, GPIO.OUT)
-            GPIO.output(p, 0)
+def get_triangle_voltage(freq=1, amp=1.65, offset=1.65):
+    """Возвращает текущее напряжение треугольной формы"""
+    t = time.time()
+    period = 1.0 / freq
+    t_mod = (t % period) / period
     
-    def out(self, v):
-        v = max(0, min(self.vmax, v))
-        num = int((v / self.vmax) * 255)
-        
-        for i, p in enumerate(self.pins):
-            GPIO.output(p, (num >> (7-i)) & 1)
+    if t_mod < 0.5:
+        val = 4 * t_mod - 1
+    else:
+        val = 3 - 4 * t_mod
     
-    def stop(self):
-        for p in self.pins:
-            GPIO.output(p, 0)
-        GPIO.cleanup()
+    return offset + amp * val
 
-# Пины и настройки
-dac = DAC([16,20,21,25,26,17,27,22], 3.3)
-
-try:
-    print("Синус 50 Гц на осциллограф")
-    t0 = time.time()
-    
-    while True:
-        t = time.time() - t0
-        v = 1.65 + 1.5 * math.sin(2 * math.pi * 50 * t)  # 50 Гц
-        dac.out(v)
-        time.sleep(0.0005)  # 2 кГц
-        
-except KeyboardInterrupt:
-    dac.stop()
+# В цикле программы:
+while True:
+    voltage = get_triangle_voltage(freq=10, amp=1.5, offset=1.65)
+    dac.set_voltage(voltage)
+    time.sleep(0.001)stop()
