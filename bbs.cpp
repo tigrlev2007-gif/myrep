@@ -1,53 +1,61 @@
 import RPi.GPIO as GPIO
-import time
 
-GPIO.setmode(GPIO.BCM)
+class R2R_DAC:
+    def init(self, gpio_bits, dynamic_range, verbose=False):
+        self.gpio_bits = gpio_bits
+        self.dynamic_range = dynamic_range
+        self.verbose = verbose
+        
+        GPIO.setmode(GPIO.BCM)
+        for pin in self.gpio_bits:
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, GPIO.LOW)
+        
+        if self.verbose:
+            print(f"ЦАП инициализирован. Пины: {gpio_bits}")
+            print(f"Динамический диапазон: {dynamic_range} В")
+    
+    def deinit(self):
+        GPIO.output(self.gpio_bits, GPIO.LOW)
+        GPIO.cleanup()
+        if self.verbose:
+            print("GPIO очищены")
+    
+    def set_number(self, number):
+        if number < 0 or number > 255:
+            if self.verbose:
+                print(f"Ошибка: число {number} вне диапазона 0-255")
+            return
+        
+        bits = [(number >> i) & 1 for i in range(7, -1, -1)]
+        GPIO.output(self.gpio_bits, bits)
+        
+        if self.verbose:
+            print(f"Число: {number}, биты: {bits}")
+    
+    def set_voltage(self, voltage):
+        if voltage < 0 or voltage > self.dynamic_range:
+            print(f"Напряжение {voltage} В вне диапазона (0 - {self.dynamic_range:.2f} В)")
+            return
+        
+        number = int((voltage / self.dynamic_range) * 255)
+        self.set_number(number)
 
-# Настройка пинов
-BUTTON_PIN = 17  # пин кнопки
-LED_PIN = 24     # пин светодиода
-
-GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)  # подтяжка к питанию
-GPIO.setup(LED_PIN, GPIO.OUT)
-
-led_state = False  # начальное состояние - выключен
-last_button_state = GPIO.HIGH  # предыдущее состояние кнопки
-
-GPIO.output(LED_PIN, led_state)
-
-try:
-    print("Программа запущена")
-    print("Нажмите кнопку чтобы включить светодиод")
-    print("Нажмите ещё раз чтобы выключить")
-    print("Ctrl+C для выхода")
-    print("-" * 30)
-
-    while True:
-        # Читаем текущее состояние кнопки
-        current_button_state = GPIO.input(BUTTON_PIN)
-
-        # Проверяем нажатие (переход из HIGH в LOW)
-        if last_button_state == GPIO.HIGH and current_button_state == GPIO.LOW:
-            # Меняем состояние светодиода на противоположное
-            led_state = not led_state
-            GPIO.output(LED_PIN, led_state)
-
-            if led_state:
-                print("💡 Светодиод ВКЛ")
-            else:
-                print("⚫ Светодиод ВЫКЛ")
-
-            # Защита от дребезга контактов
-            time.sleep(0.2)
-
-        # Запоминаем текущее состояние для следующей итерации
-        last_button_state = current_button_state
-
-        # Небольшая задержка
-        time.sleep(0.01)
-
-except KeyboardInterrupt:
-    print("\nПрограмма остановлена")
-
-finally:
-    GPIO.cleanup()
+if name == "main":
+    dac = None
+    try:
+        dac = R2R_DAC([16, 20, 21, 25, 26, 17, 27, 22], 3.183, True)
+        
+        while True:
+            try:
+                voltage = float(input("Введите напряжение в Вольтах: "))
+                dac.set_voltage(voltage)
+            except ValueError:
+                print("Вы ввели не число. Попробуйте ещё раз\n")
+    
+    except KeyboardInterrupt:
+        print("\nПрограмма прервана пользователем")
+    
+    finally:
+        if dac:
+            dac.deinit()
