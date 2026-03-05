@@ -1,22 +1,29 @@
-import r2r_dac as r2r
-import signal_generator as sg
+import RPi.GPIO as GPIO
 import time
 
-amplitude = 3.2
-signal_frequency = 10
-sampling_frequency = 1000
+GPIO.setmode(GPIO.BCM)
+
+LED_PIN = 24
+GPIO.setup(LED_PIN, GPIO.OUT)
+
+class R2R_DAC:
+    def __init__(self, gpio_bits, dynamic_range, verbose = False):
+        self.gpio_bits = gpio_bits
+        self.dynamic_range = dynamic_range
+
+pwm = GPIO.PWM(LED_PIN, 100)
+pwm.start(0)
 
 try:
-    dac = r2r.R2R_DAC([16, 20, 21, 25, 26, 17, 27, 22], 3.183, False)
-    start_time = time.time()
-    
     while True:
-        current_time = time.time() - start_time
-        relative_amplitude = sg.get_triangle_wave_amplitude(signal_frequency, current_time)
-        voltage = relative_amplitude * amplitude
-        dac.set_voltage(voltage)
-        sg.wait_for_sampling_period(sampling_frequency)
+        for duty in range(0, 101, 5):
+            pwm.ChangeDutyCycle(duty)
+            time.sleep(0.05)
 
-finally:
-    dac.deinit()
+        for duty in range(100, -1, -5):
+            pwm.ChangeDutyCycle(duty)
+            time.sleep(0.05)
 
+except KeyboardInterrupt:
+    pwm.stop()
+    GPIO.cleanup()
