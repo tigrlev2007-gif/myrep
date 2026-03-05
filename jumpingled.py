@@ -1,42 +1,40 @@
 import RPi.GPIO as GPIO
-import time
 
-GPIO.setmode(GPIO.BCM)
+class R2R_DAC:
+    def __init__(self, gpio_bits, dynamic_range, verbose = False):
+        self.gpio_bits = gpio_bits
+        self.dynamic_range = dynamic_range
+        self.verbose = verbose
 
-LED_PINS = [16, 20, 21, 25, 26, 17, 27, 22]
-DYNAMIC_RANGE = 3.183
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(self.gpio_bits, GPIO.OUT, initial = 0)
 
-for pin in LED_PINS:
-    GPIO.setup(pin, GPIO.OUT)
-    GPIO.output(pin, GPIO.LOW)
+    def deinit(self):
+        GPIO.output(self.gpio_bits, 0)
+        GPIO.cleanup()
 
-def voltage_to_binary(voltage):
-    if voltage < 0 or voltage > DYNAMIC_RANGE:
-        print(f"Напряжение выходит за диапазон (0 - {DYNAMIC_RANGE} В)")
-        return None
+    def set_number(self, number):
+        return [int(bit) for bit in bin(number)[2:].zfill(8)]
 
-    number = int((voltage / DYNAMIC_RANGE) * 255)
-    bits = [(number >> i) & 1 for i in range(7, -1, -1)]
+    def set_voltage(self, voltage):
+        if voltage < 0: voltage = 0
+        if voltage > self.dynamic_range: voltage = self.dynamic_range
+        number = int(voltage / self.dynamic_range * 255)
+        bit_list = self.set_number(number)
+        GPIO.output(self.gpio_bits, bit_list)
 
-    print(f"Напряжение: {voltage} В")
-    print(f"Число: {number}")
-    print(f"Биты: {bits}")
+if __name__ == "__main__":
+    try:
+        dac = R2R_DAC([16, 20, 21, 25, 26, 17, 27, 22], 3.183, True)
 
-    return bits
+        while True:
+            try:
+                voltage = float(input("Введите напряжение в Вольтах: "))
+                dac.set_voltage(voltage)
 
-def set_leds(bits):
-    if bits:
-        GPIO.output(LED_PINS, bits)
+            except ValueError:
+                print("Вы ввели не число. Попробуйте ещё раз\n")
 
-try:
-    while True:
-        try:
-            voltage = float(input("Введите напряжение в Вольтах: "))
-            bits = voltage_to_binary(voltage)
-            set_leds(bits)
-            time.sleep(0.5)
-        except ValueError:
-            print("Ошибка: введите число")
+    finally:
+        dac.deinit()
 
-except KeyboardInterrupt:
-    GPIO.cleanup()
