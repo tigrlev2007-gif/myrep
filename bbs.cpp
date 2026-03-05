@@ -2,38 +2,20 @@ import r2r_dac as r2r
 import signal_generator as sg
 import time
 
-# Параметры сигнала
-amplitude = 3.2
+amplitude = 3.183
 signal_frequency = 10
 sampling_frequency = 1000
 
 try:
-    # Создаём объект R2R ЦАП
-    dac = r2r.R2RDAC()
-
-    print(f"Генерация синусоиды: {signal_frequency}Гц, амплитуда {amplitude}В, "
-          f"дискретизация {sampling_frequency}Гц")
-
+    dac = r2r.R2R_DAC([16, 20, 21, 25, 26, 17, 27, 22], 3.183, True)
+    start_time = time.time()
+    
     while True:
-        # Текущее время
-        current_time = time.time()
-
-        # Амплитуда синусоиды (0..1)
-        sin_amplitude = sg.get_sin_wave_amplitude(signal_frequency, current_time)
-
-        # Напряжение = амплитуда * коэффициент
-        voltage = amplitude * sin_amplitude
-
-        # Выдаём на ЦАП
+        current_time = time.time() - start_time
+        relative_amplitude = sg.get_sin_wave_amplitude(signal_frequency, current_time)
+        voltage = relative_amplitude * amplitude
         dac.set_voltage(voltage)
-
-        # Ждём период дискретизации
         sg.wait_for_sampling_period(sampling_frequency)
 
-except KeyboardInterrupt:
-    print("\nОстановка генератора по Ctrl+C")
-
 finally:
-    # Закрываем ЦАП
     dac.deinit()
-    print("ЦАП отключён")
